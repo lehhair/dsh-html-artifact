@@ -23,6 +23,7 @@ import {
 import rowCss from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/ToolRow.module.css'
 import { artifactArgs, artifactCardModel, type ArtifactSummaryView, type ToolCallOwnerProps } from './contract.ts'
 import { buildSandboxedHtmlDocument, hostArtifactTheme, type ArtifactTheme } from './sandbox.ts'
+import { DraftSurface } from './stream/DraftSurface.tsx'
 import css from './artifact.module.css'
 
 /** Row state semantic; colors self-supplied via StateDot. */
@@ -146,8 +147,10 @@ function rowTitle(op: string, id: string | undefined): string {
 
 /** The artifact row: stock ToolRow chrome with the op-specific body. Expanded
  *  by default: the preview is the point of the tool, so a settled artifact
- *  row opens to show it without a click. */
-export function ArtifactRow({ toolName, block, inspect }: ArtifactRowProps) {
+ *  row opens to show it without a click. A RUNNING create call renders the
+ *  streaming bridge iframe — the artifact tool row is the single surface for
+ *  both the streamed draft and the settled snapshot. */
+export function ArtifactRow({ toolName, block, cwd, openFile, inspect }: ArtifactRowProps) {
   const [expanded, setExpanded] = useState(true)
   const model = artifactCardModel(block)
   const args = artifactArgs(block)
@@ -164,23 +167,27 @@ export function ArtifactRow({ toolName, block, inspect }: ArtifactRowProps) {
     : block.error?.code === 'interrupted' ? 'stopped'
       : block.isError ? 'error' : 'ok'
 
-  const body = model === null ? null : (() => {
-    const view = model.view
-    switch (view.op) {
-      case 'create': return (
-        <ArtifactSurface id={view.id} revision={view.revision} html={view.html}
-          {...view.title !== undefined ? { title: view.title } : {}} />
-      )
-      case 'patch': return (
-        // The patch row renders the NEW html directly — the timeline shows the
-        // artifact as it was at each call, no diff and no cross-row sync.
-        <ArtifactSurface id={view.id} revision={view.revision} html={view.html} />
-      )
-      case 'read': return <SourceView html={view.html} truncated={view.truncated === true} />
-      case 'destroy': return <div className={css.closed}>Artifact {view.id} closed.</div>
-      case 'list': return <ArtifactList artifacts={view.artifacts} />
-    }
-  })()
+  // Running create: the streaming bridge iframe (the tool row IS the draft).
+  // Settled: the op-specific timeline-snapshot body.
+  const body = !done
+    ? (op === 'create' && args?.html !== undefined ? <DraftSurface html={args.html} /> : null)
+    : model === null ? null : (() => {
+      const view = model.view
+      switch (view.op) {
+        case 'create': return (
+          <ArtifactSurface id={view.id} revision={view.revision} html={view.html}
+            {...view.title !== undefined ? { title: view.title } : {}} />
+        )
+        case 'patch': return (
+          // The patch row renders the NEW html directly — the timeline shows the
+          // artifact as it was at each call, no diff and no cross-row sync.
+          <ArtifactSurface id={view.id} revision={view.revision} html={view.html} />
+        )
+        case 'read': return <SourceView html={view.html} truncated={view.truncated === true} />
+        case 'destroy': return <div className={css.closed}>Artifact {view.id} closed.</div>
+        case 'list': return <ArtifactList artifacts={view.artifacts} />
+      }
+    })()
   const expandable = body !== null
   const open = expanded && expandable
   const toggleExpand = () => { setExpanded(v => !v) }
@@ -196,7 +203,8 @@ export function ArtifactRow({ toolName, block, inspect }: ArtifactRowProps) {
         chevronClassName={rowCss.chevron}
         icon={state === 'error' ? <StateDot state="error" />
           : state === 'stopped' ? <StateDot state="warning" />
-            : <IconEditOutline16 size={14} />}
+            : state === 'running' ? <StateDot state="ongoing" />
+              : <IconEditOutline16 size={14} />}
         title={title}
         open={open}
         expandable={expandable}

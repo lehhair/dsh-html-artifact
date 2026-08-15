@@ -1,24 +1,31 @@
 /**
- * The `artifact-draft` chat node renderer: the artifact TOOL ROW itself, shown
- * from the moment the model starts writing the create call — the fastest
- * possible tool surface. The row uses the exact stock ToolRow chrome
- * (DisclosureRow, running state dot, expanded by default) and its body is a
- * PERSISTENT bridge iframe whose content streams in by postMessage as the
- * model writes the html (the iframe never reloads). When the call is
- * announced or settles, the draft row disappears and the keyed toolview row —
- * the same chrome, the settled snapshot — takes over seamlessly.
+ * The streaming bridge surface and the `artifact-draft` chat node adapter.
+ *
+ * DraftSurface: a PERSISTENT iframe whose srcdoc loads once and receives
+ * streamed html by postMessage (the iframe never reloads while the model
+ * writes). Draft html is injected into a root div via innerHTML, which never
+ * executes embedded <script> tags — artifact scripts run only in the settled
+ * snapshot surface after the call completes.
+ *
+ * ArtifactDraftNodeView: the chat-node adapter for the streaming period. The
+ * engine only materializes tool rows at `tool/call`, so the streaming period
+ * needs a chat node to carry a row; this adapter renders the SAME
+ * {@link ArtifactRow} component (the artifact tool row) with a synthetic
+ * running block whose args are the streamed create call. No second row
+ * component exists — the artifact tool row is the single surface for both the
+ * streamed draft and the settled snapshot.
  * @module
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { DisclosureRow, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import rowCss from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/ToolRow.module.css'
+import type { RunningToolCall } from '@deepseek-ai/dsh-client-runtime/client'
+import { ArtifactRow } from '../ArtifactRow.tsx'
 import { hostArtifactTheme, type ArtifactTheme } from '../sandbox.ts'
 import { buildStreamingBridgeDocument } from './bridge.ts'
 import css from '../artifact.module.css'
 
 /** The persistent bridge iframe: receives streamed html by postMessage. */
-function DraftSurface({ html }: { html: string }) {
+export function DraftSurface({ html }: { html: string }) {
   const [height, setHeight] = useState(200)
   const [theme] = useState<ArtifactTheme>(hostArtifactTheme)
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -60,37 +67,32 @@ function DraftSurface({ html }: { html: string }) {
   )
 }
 
-/** The keyed `artifact-draft` chat node view: the streaming tool row. */
-export function ArtifactDraftNodeView({ node }: ChatNodeViewProps<'artifact-draft'>) {
-  const [expanded, setExpanded] = useState(true)
-  const { callId, html, title } = node.data
-  const summary = title ?? callId
+/** The keyed `artifact-draft` chat node view: renders the artifact TOOL ROW
+ *  with the streamed create call as its running block. */
+export function ArtifactDraftNodeView({ node, cwd, openFile, inspectCall }: ChatNodeViewProps<'artifact-draft'>) {
+  const data = node.data
+  const block: RunningToolCall = {
+    callId: data.callId,
+    name: 'artifact',
+    argsRaw: JSON.stringify({
+      op: 'create',
+      ...data.title === undefined ? {} : { title: data.title },
+      html: data.html,
+    }),
+    turn: 0,
+    step: 0,
+    time: 0,
+    callView: null,
+    subCalls: [],
+  }
   return (
-    <div className={rowCss.root} data-variant="edit" data-tool="artifact" data-state="running" data-artifact-draft-row="">
-      <span className={rowCss.visuallyHidden}>Running</span>
-      <DisclosureRow
-        rowClassName={rowCss.row}
-        leadingClassName={rowCss.leading}
-        titleClassName={rowCss.title}
-        chevronClassName={rowCss.chevron}
-        icon={<StateDot state="ongoing" />}
-        title="Create HTML artifact"
-        open={expanded}
-        expandable
-        expandOnRowClick
-        keepContentWhenOpen
-        onToggle={() => setExpanded(v => !v)}
-        collapsedContent={summary !== '' && (
-          <>
-            <span className={rowCss.sep} aria-hidden />
-            <span className={rowCss.summary}>{summary}</span>
-          </>
-        )}
-      >
-        <div className={rowCss.bodyWrap}>
-          <DraftSurface html={html} />
-        </div>
-      </DisclosureRow>
-    </div>
+    <ArtifactRow
+      callId={data.callId}
+      toolName="artifact"
+      block={block}
+      cwd={cwd}
+      openFile={openFile}
+      inspect={inspectCall === undefined ? undefined : () => inspectCall(data.callId)}
+    />
   )
 }

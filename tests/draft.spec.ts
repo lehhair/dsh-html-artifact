@@ -49,31 +49,41 @@ function toolResult(seq: number, turn: number, step: number, callId: string): Se
 
 const KEY = 'artifact-draft:1:2'
 
-/** Drive the Definition like the engine: step/start start, then per-event update. */
-function drive(events: SessionEvent[]): { node: DraftNode | null } {
+/** Drive the Definition like the engine: step/start start, then per-event
+ *  update, tracking the materialized 'chat' target so the withdrawal rule
+ *  (return the same key hidden instead of null) is observable. */
+function drive(events: SessionEvent[]): { node: DraftNode | null; visible: DraftNode | null } {
   const definition = artifactDraftDefinition as Definition
   const startEvent = events[0]
   if (startEvent === undefined || startEvent.type !== 'step/start') throw new Error('drive needs step/start first')
   const startMatch = match(startEvent.seq, startEvent, 'start')
   const matches: ConversationMatch[] = [startMatch]
+  const current = new Map<string, DraftNode>()
   let state: unknown = definition.start(
     { key: KEY, kind: 'artifact-draft', id: '1:2', matches, start: startMatch, state: undefined, current: new Map() } as unknown as ConversationNodeContext<unknown>,
     startMatch,
     { previous: () => undefined },
   )
+  const build = (): DraftNode | null => {
+    const context = { key: KEY, kind: 'artifact-draft', id: '1:2', matches, start: startMatch, state, current } as unknown as ConversationNodeContext<unknown>
+    const node = definition.buildViewNode?.(context) as unknown as DraftNode | null
+    current.set('chat', node as unknown as DraftNode)
+    return node
+  }
+  const first = build()
   for (const event of events.slice(1)) {
     const result = definition.match(event)
     if (result === null) continue
     const update = match(event.seq, event, result.role)
     matches.push(update)
     state = definition.update(
-      { key: KEY, kind: 'artifact-draft', id: '1:2', matches, start: startMatch, state, current: new Map() } as unknown as ConversationNodeContext<unknown> & { state: unknown },
+      { key: KEY, kind: 'artifact-draft', id: '1:2', matches, start: startMatch, state, current } as unknown as ConversationNodeContext<unknown> & { state: unknown },
       update,
     )
+    build()
   }
-  const context = { key: KEY, kind: 'artifact-draft', id: '1:2', matches, start: startMatch, state, current: new Map() } as unknown as ConversationNodeContext<unknown>
-  const node = definition.buildViewNode?.(context) as unknown as DraftNode | null
-  return { node }
+  const last = build()
+  return { node: last, visible: first }
 }
 
 describe('artifactDraftDefinition.match', () => {
@@ -127,7 +137,11 @@ describe('artifactDraftDefinition streaming fold', () => {
       toolCall(4, 1, 2, 'call_1', 'artifact', '{"op":"create","html":"<p>x</p>"}'),
     ]
     const { node } = drive(events)
-    expect(node).toBeNull()
+    // Withdrawn is forbidden: the materialized target stays, hidden, same key.
+    expect(node).not.toBeNull()
+    expect(node!.kind).toBe('artifact-draft')
+    expect(node!.visibility).toBe('hidden')
+    expect(node!.data.callId).toBe('call_1')
   })
 
   it('hides the draft once the call settles', () => {
@@ -137,7 +151,8 @@ describe('artifactDraftDefinition streaming fold', () => {
       toolResult(5, 1, 2, 'call_1'),
     ]
     const { node } = drive(events)
-    expect(node).toBeNull()
+    expect(node).not.toBeNull()
+    expect(node!.visibility).toBe('hidden')
   })
 
   it('produces no draft for a patch call (no html argument)', () => {

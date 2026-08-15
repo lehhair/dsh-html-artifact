@@ -194,9 +194,16 @@ export const artifactDraftDefinition: ConversationNodeDefinition<ArtifactDraftSt
   },
   buildViewNode(context) {
     const state = context.state
-    if (state === undefined) return null
-    const active = activeDraft(state)
-    if (active === undefined) return null
+    const active = state === undefined ? undefined : activeDraft(state)
+    if (active === undefined) {
+      // The engine forbids withdrawing a target this Definition has already
+      // materialized: when a previous build produced a visible node, keep the
+      // SAME key with hidden visibility (the settled tool row takes over);
+      // when nothing was ever materialized, there is nothing to hide.
+      const current = context.current.get('chat')
+      if (current === undefined || current === null) return null
+      return { ...current, visibility: 'hidden' }
+    }
     // Anchor at the first streamed artifact delta so the draft sits where the
     // model started writing the call.
     let anchorSeq = context.start?.event.seq ?? 0

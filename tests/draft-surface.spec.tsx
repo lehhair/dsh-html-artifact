@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// ArtifactDraftNodeView: the STREAMING TOOL ROW — stock ToolRow chrome with a
-// persistent bridge iframe body that receives streamed html by postMessage.
+// ArtifactDraftNodeView: the streaming-period chat node adapter — it renders
+// the artifact TOOL ROW itself (ArtifactRow) with a synthetic running block,
+// so the streamed draft and the settled snapshot are the same surface.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
@@ -21,18 +22,24 @@ function props(html: string, title?: string): ChatNodeViewProps<'artifact-draft'
       visibility: 'visible',
       data: { callId: 'call_1', html, ...title === undefined ? {} : { title } },
     },
+    openFile: () => {},
+    inspectCall: () => {},
+    forkAt: () => {},
+    loadImage: async () => '',
+    fileMentions: () => undefined,
     t: ((key: string) => key) as ChatNodeViewProps<'artifact-draft'>['t'],
   } as unknown as ChatNodeViewProps<'artifact-draft'>
 }
 
 describe('ArtifactDraftNodeView', () => {
-  it('renders the TOOL ROW chrome (title, running state) with a bridge iframe body, expanded by default', () => {
+  it('renders the artifact TOOL ROW (not a separate card) with a bridge iframe body, expanded by default', () => {
     const { container } = render(<ArtifactDraftNodeView {...props('<div>hi</div>', 'Demo')} />)
-    const row = container.querySelector('[data-artifact-draft-row]')
+    // The row is the artifact tool row itself.
+    const row = container.querySelector('[data-artifact-row]')
     expect(row).not.toBeNull()
     expect(container.textContent).toContain('Create HTML artifact')
     expect(container.textContent).toContain('Demo')
-    // Expanded by default: the iframe body is immediately visible.
+    // Expanded by default: the bridge iframe body is immediately visible.
     const frame = container.querySelector('iframe') as HTMLIFrameElement | null
     expect(frame).not.toBeNull()
     expect(frame!.getAttribute('sandbox')).toBe('allow-scripts')

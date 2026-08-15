@@ -49,9 +49,17 @@ function rowProps(block: ToolCallBlock): ArtifactRowProps {
 }
 
 describe('artifactCardModel', () => {
-  it('renders no body for a running call (result-only card)', () => {
-    const { container } = render(<ArtifactRow {...rowProps(running({ op: 'create' }))} />)
-    expect(container.querySelector('[data-artifact-surface]')).toBeNull()
+  it('renders the streaming bridge iframe while a create call is running (the tool row IS the draft)', () => {
+    const { container } = render(<ArtifactRow {...rowProps(running({ op: 'create', html: '<div>streaming</div>' }))} />)
+    const frame = container.querySelector('iframe') as HTMLIFrameElement | null
+    expect(frame).not.toBeNull()
+    expect(frame!.getAttribute('srcdoc')).toContain('dsh-artifact-root')
+    expect(container.textContent).toContain('Create HTML artifact')
+  })
+
+  it('renders no body for a running non-create call', () => {
+    const { container } = render(<ArtifactRow {...rowProps(running({ op: 'list' }))} />)
+    expect(container.querySelector('iframe')).toBeNull()
   })
 
   it('renders no body for a non-artifact view', () => {
