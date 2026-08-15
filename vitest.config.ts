@@ -1,0 +1,42 @@
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vitest/config'
+
+/** DSH fork sources: the plugin's linked devDependencies resolve to the fork's
+ *  src (like the monorepo's tsconfig paths) — the linked packages' `./client`
+ *  exports point at browser bundles, so tests must resolve to src instead. */
+const fork = fileURLToPath(new URL('../dsh2026/deepseek-harness/packages/client', import.meta.url))
+
+/** React must be ONE instance: the fork's primitives (linked via the monorepo)
+ *  call react hooks that the artifact row invokes, and two React copies break
+ *  the hook dispatcher. Array form with the longer subpath keys first. */
+const require = createRequire(import.meta.url)
+
+export default defineConfig({
+  test: {
+    include: ['tests/**/*.spec.ts', 'tests/**/*.spec.tsx'],
+    environment: 'node',
+    pool: 'threads',
+  },
+  resolve: {
+    alias: [
+      { find: 'react/jsx-dev-runtime', replacement: require.resolve('react/jsx-dev-runtime') },
+      { find: 'react/jsx-runtime', replacement: require.resolve('react/jsx-runtime') },
+      { find: 'react-dom', replacement: require.resolve('react-dom') },
+      { find: 'react', replacement: require.resolve('react') },
+      // The src/ prefix must precede the bare package name (string finds
+      // prefix-match) so tests can import fork internals.
+      { find: '@deepseek-ai/dsh-client-ui-primitives/src/', replacement: `${fork}/ui-primitives/src/` },
+      { find: '@deepseek-ai/dsh-client-runtime/client', replacement: `${fork}/runtime/src/client/index.ts` },
+      { find: '@deepseek-ai/dsh-client-runtime', replacement: `${fork}/runtime/src/index.ts` },
+      { find: '@deepseek-ai/dsh-client-ui-slots', replacement: `${fork}/ui-slots/src/index.ts` },
+      { find: '@deepseek-ai/dsh-client-ui-primitives', replacement: `${fork}/ui-primitives/src/index.ts` },
+      { find: '@deepseek-ai/dsh-client-ui-tool/client', replacement: `${fork}/ui-tool/src/client/index.ts` },
+      { find: '@deepseek-ai/dsh-client-ui-conversation/client', replacement: `${fork}/ui-conversation/src/client/index.ts` },
+      { find: '@deepseek-ai/dsh-client-ui-layout/client', replacement: `${fork}/ui-layout/src/client/index.ts` },
+      { find: '@deepseek-ai/dsh-client-locale/client', replacement: `${fork}/locale/src/client/index.ts` },
+      { find: '@deepseek-ai/dsh-client-test-runtime', replacement: `${fork}/../test-support/client-runtime/src/index.ts` },
+      { find: '@deepseek-ai/dsh-client-test-runtime/client', replacement: `${fork}/../test-support/client-runtime/src/client/index.ts` },
+    ],
+  },
+})

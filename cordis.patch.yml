@@ -1,0 +1,7 @@
+# dsh bundle patch: inserts this plugin into a profile's layer stack. The
+# plugin registers the `artifact` tool into the tools registry's global layer
+# (every agent's scope chain selects it) and mounts the browser half (the
+# keyed `tool.call.toolview` atomic view) from the bundled client.js.
+- insert:
+    - id: dsh-html-artifact
+      name: '@dsh-external/dsh-html-artifact'
