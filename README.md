@@ -1,4 +1,4 @@
-[![dshfind](https://dshfind.com/api/badge/lehhair/dsh-html-artifact?lang=zh)](https://dshfind.com/zh/plugins/lehhair/dsh-html-artifact?ref=badge)
+[![dshfind](https://dshfind.com/api/card/lehhair/dsh-html-artifact?lang=zh)](https://dshfind.com/zh/plugins/lehhair/dsh-html-artifact?ref=badge)
 
 # dsh-html-artifact
 
