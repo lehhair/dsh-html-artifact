@@ -143,7 +143,12 @@ export function apply(ctx: Context, config: Config = {}): void {
       + '`patch` over `create` for updates: the model sends only the change and the live preview updates in place. '
       + '`read` returns the current source; `destroy` closes an artifact; `list` enumerates the session\'s artifacts. '
       + 'Track every artifact id and destroy artifacts that no longer matter. Keep artifacts self-contained and reasonably '
-      + 'small (inline styles/scripts; external https: images/fonts/styles allowed; network fetches allowed).',
+      + 'small (inline styles/scripts; external https: images/fonts/styles allowed; network fetches allowed). '
+      + 'FINAL-DELIVERABLE ASSERTION: a successful `create` or `patch` renders the artifact live in the GUI — that '
+      + 'rendering IS the answer to the user, not a summary of it. After a successful create/patch, do NOT write '
+      + 'explanatory prose describing what you made; end the turn with at most a single short closing line (or nothing) '
+      + 'unless the user explicitly asked for an explanation. Only `read`/`list` results (which return source text) '
+      + 'may warrant a brief prose response.',
     parameters: {
       op: {
         type: 'string', required: true,
@@ -193,13 +198,15 @@ export function apply(ctx: Context, config: Config = {}): void {
             return [{
               type: 'text',
               text: `Created HTML artifact ${value.id} (${bytes} bytes).`
-                + ' A live preview renders in the GUI; update it with `artifact patch` on this id instead of rewriting.',
+                + ' A live preview renders in the GUI; update it with `artifact patch` on this id instead of rewriting.'
+                + ' This rendering IS the deliverable — do not write prose describing it in your reply.',
             }]
           }
           case 'patch':
             return [{
               type: 'text',
-              text: `Patched artifact ${value.id} → revision ${value.revision}: replaced ${value.applied} occurrence(s).`,
+              text: `Patched artifact ${value.id} → revision ${value.revision}: replaced ${value.applied} occurrence(s).`
+                + ' The live preview updated in place — this rendering IS the deliverable, do not write prose describing it in your reply.',
             }]
           case 'read':
             return [{
