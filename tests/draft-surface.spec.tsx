@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// ArtifactDraftNodeView: the streaming draft card — a persistent bridge
-// iframe whose srcdoc never reloads, receiving streamed html by postMessage.
+// ArtifactDraftNodeView: the STREAMING TOOL ROW — stock ToolRow chrome with a
+// persistent bridge iframe body that receives streamed html by postMessage.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
@@ -9,7 +9,7 @@ import { ArtifactDraftNodeView } from '../src/client/stream/DraftSurface.tsx'
 
 afterEach(cleanup)
 
-function props(html: string): ChatNodeViewProps<'artifact-draft'> {
+function props(html: string, title?: string): ChatNodeViewProps<'artifact-draft'> {
   return {
     node: {
       key: 'artifact-draft:1:2',
@@ -19,17 +19,20 @@ function props(html: string): ChatNodeViewProps<'artifact-draft'> {
       anchorSeq: 1,
       location: { kind: 'unresolved' },
       visibility: 'visible',
-      data: { callId: 'call_1', html },
+      data: { callId: 'call_1', html, ...title === undefined ? {} : { title } },
     },
     t: ((key: string) => key) as ChatNodeViewProps<'artifact-draft'>['t'],
   } as unknown as ChatNodeViewProps<'artifact-draft'>
 }
 
 describe('ArtifactDraftNodeView', () => {
-  it('renders the generating bar and a persistent bridge iframe', () => {
-    const { container } = render(<ArtifactDraftNodeView {...props('<div>hi</div>')} />)
-    expect(container.querySelector('[data-artifact-draft]')).not.toBeNull()
-    expect(container.textContent).toContain('Generating HTML artifact')
+  it('renders the TOOL ROW chrome (title, running state) with a bridge iframe body, expanded by default', () => {
+    const { container } = render(<ArtifactDraftNodeView {...props('<div>hi</div>', 'Demo')} />)
+    const row = container.querySelector('[data-artifact-draft-row]')
+    expect(row).not.toBeNull()
+    expect(container.textContent).toContain('Create HTML artifact')
+    expect(container.textContent).toContain('Demo')
+    // Expanded by default: the iframe body is immediately visible.
     const frame = container.querySelector('iframe') as HTMLIFrameElement | null
     expect(frame).not.toBeNull()
     expect(frame!.getAttribute('sandbox')).toBe('allow-scripts')

@@ -1,14 +1,18 @@
 /**
- * The `artifact-draft` chat node renderer: a compact live card showing the
- * model's streaming create html inside a PERSISTENT bridge iframe. Streamed
- * html updates arrive by postMessage (the iframe never reloads); the card
- * carries a "generating" bar and sits in the chat flow at the step where the
- * model started writing the call. It disappears automatically when the call
- * is announced or settled — the keyed tool row owns the settled display.
+ * The `artifact-draft` chat node renderer: the artifact TOOL ROW itself, shown
+ * from the moment the model starts writing the create call — the fastest
+ * possible tool surface. The row uses the exact stock ToolRow chrome
+ * (DisclosureRow, running state dot, expanded by default) and its body is a
+ * PERSISTENT bridge iframe whose content streams in by postMessage as the
+ * model writes the html (the iframe never reloads). When the call is
+ * announced or settles, the draft row disappears and the keyed toolview row —
+ * the same chrome, the settled snapshot — takes over seamlessly.
  * @module
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { DisclosureRow, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import rowCss from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/ToolRow.module.css'
 import { hostArtifactTheme, type ArtifactTheme } from '../sandbox.ts'
 import { buildStreamingBridgeDocument } from './bridge.ts'
 import css from '../artifact.module.css'
@@ -56,16 +60,37 @@ function DraftSurface({ html }: { html: string }) {
   )
 }
 
-/** The keyed `artifact-draft` chat node view. */
+/** The keyed `artifact-draft` chat node view: the streaming tool row. */
 export function ArtifactDraftNodeView({ node }: ChatNodeViewProps<'artifact-draft'>) {
-  const { callId, html } = node.data
+  const [expanded, setExpanded] = useState(true)
+  const { callId, html, title } = node.data
+  const summary = title ?? callId
   return (
-    <div className={css.draft} data-artifact-draft="">
-      <div className={css.draftBar}>
-        <span className={css.draftPulse} aria-hidden />
-        <span className={css.draftLabel}>Generating HTML artifact {callId}…</span>
-      </div>
-      <DraftSurface html={html} />
+    <div className={rowCss.root} data-variant="edit" data-tool="artifact" data-state="running" data-artifact-draft-row="">
+      <span className={rowCss.visuallyHidden}>Running</span>
+      <DisclosureRow
+        rowClassName={rowCss.row}
+        leadingClassName={rowCss.leading}
+        titleClassName={rowCss.title}
+        chevronClassName={rowCss.chevron}
+        icon={<StateDot state="ongoing" />}
+        title="Create HTML artifact"
+        open={expanded}
+        expandable
+        expandOnRowClick
+        keepContentWhenOpen
+        onToggle={() => setExpanded(v => !v)}
+        collapsedContent={summary !== '' && (
+          <>
+            <span className={rowCss.sep} aria-hidden />
+            <span className={rowCss.summary}>{summary}</span>
+          </>
+        )}
+      >
+        <div className={rowCss.bodyWrap}>
+          <DraftSurface html={html} />
+        </div>
+      </DisclosureRow>
     </div>
   )
 }

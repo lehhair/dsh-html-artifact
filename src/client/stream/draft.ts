@@ -19,7 +19,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { conversationContextKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { extractStreamingHtml, isStreamingCreate } from './extract.ts'
+import { extractStreamingHtml, extractStreamingTitle, isStreamingCreate } from './extract.ts'
 
 /** The wire shape of one streamed artifact call inside the Definition state. */
 interface DraftCall {
@@ -30,6 +30,8 @@ interface DraftCall {
   html: string
   /** Whether the args have yielded an html value yet (a create call's draft). */
   hasHtml: boolean
+  /** The title argument so far, when it has completed. */
+  title?: string
   /** Whether `tool/call` arrived (the keyed tool row now owns the display). */
   announced: boolean
   /** Whether `tool/result` arrived (the draft is done either way). */
@@ -48,6 +50,8 @@ export interface ArtifactDraftData {
   callId: string
   /** The html streamed so far. */
   html: string
+  /** The completed title argument so far, when it has arrived. */
+  title?: string
 }
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
@@ -79,11 +83,13 @@ function asArtifactToolCall(block: unknown): { id: string; arguments: string } |
 
 function draftCall(callId: string, argsRaw: string, previous: DraftCall | undefined): DraftCall {
   const extracted = extractStreamingHtml(argsRaw)
+  const title = extractStreamingTitle(argsRaw)
   return {
     callId,
     argsRaw,
     html: extracted?.html ?? '',
     hasHtml: extracted !== null,
+    ...title === undefined ? {} : { title },
     announced: previous?.announced ?? false,
     settled: previous?.settled ?? false,
   }
@@ -210,7 +216,7 @@ export const artifactDraftDefinition: ConversationNodeDefinition<ArtifactDraftSt
       anchorSeq,
       location: context.start?.location ?? context.matches[0]?.location ?? { kind: 'unresolved' },
       visibility: 'visible',
-      data: { callId: active.callId, html: active.html },
+      data: { callId: active.callId, html: active.html, ...active.title === undefined ? {} : { title: active.title } },
     }
   },
 }

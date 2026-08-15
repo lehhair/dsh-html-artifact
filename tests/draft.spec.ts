@@ -110,6 +110,16 @@ describe('artifactDraftDefinition streaming fold', () => {
     expect(node!.data.html).toBe('<div>hi')
   })
 
+  it('carries the completed title into the draft data', () => {
+    const events = [
+      stepStart(1, 1, 2),
+      delta(2, 1, 2, 0, 'call_1', 'artifact', '{"op":"create","title":"Demo","html":"<p>x</p>"}'),
+    ]
+    const { node } = drive(events)
+    expect(node).not.toBeNull()
+    expect(node!.data.title).toBe('Demo')
+  })
+
   it('hides the draft once the call is announced (tool row takes over)', () => {
     const events = [
       stepStart(1, 1, 2),

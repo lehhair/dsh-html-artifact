@@ -21,6 +21,39 @@ export function isStreamingCreate(argsRaw: string): boolean {
 }
 
 /**
+ * Extract the streamed `title` argument (appears before `html` in create
+ * args), tolerantly like {@link extractStreamingHtml}. Returns undefined when
+ * the key has not arrived or the value is still open.
+ * @param argsRaw - the accumulated (possibly partial) JSON arguments text.
+ * @returns the title text so far, or undefined when unavailable.
+ */
+export function extractStreamingTitle(argsRaw: string): string | undefined {
+  const keyIndex = argsRaw.indexOf('"title"')
+  if (keyIndex === -1) return undefined
+  let cursor = keyIndex + '"title"'.length
+  while (cursor < argsRaw.length && /\s/u.test(argsRaw[cursor] ?? '')) cursor++
+  if (argsRaw[cursor] !== ':') return undefined
+  cursor++
+  while (cursor < argsRaw.length && /\s/u.test(argsRaw[cursor] ?? '')) cursor++
+  if (argsRaw[cursor] !== '"') return undefined
+  cursor++
+  let raw = ''
+  for (; cursor < argsRaw.length; cursor++) {
+    const char = argsRaw[cursor]
+    if (char === '\\') {
+      const next = argsRaw[cursor + 1]
+      if (next === undefined) break
+      raw += char + next
+      cursor++
+      continue
+    }
+    if (char === '"') return unescapeJson(raw)
+    raw += char
+  }
+  return undefined // value still open — the title is not renderable yet
+}
+
+/**
  * Extract the streamed `html` argument from accumulated tool-call arguments.
  * @param argsRaw - the accumulated (possibly partial) JSON arguments text.
  * @returns the extracted html and completion state, or null when no `html`
