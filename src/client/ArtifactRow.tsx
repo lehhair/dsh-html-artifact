@@ -145,17 +145,15 @@ function rowTitle(op: string, id: string | undefined): string {
   }
 }
 
-/** The artifact row: stock ToolRow chrome with the op-specific body. Expanded
- *  by default: the preview is the point of the tool, so a settled artifact
- *  row opens to show it without a click. A RUNNING create call renders the
- *  streaming bridge iframe — the artifact tool row is the single surface for
- *  both the streamed draft and the settled snapshot. */
+/** The artifact row: stock ToolRow chrome with the op-specific body. Only the
+ *  rendering ops (create/patch — and the streaming create draft) expand by
+ *  default; read/destroy/list stay collapsed until clicked. */
 export function ArtifactRow({ toolName, block, cwd, openFile, inspect }: ArtifactRowProps) {
-  const [expanded, setExpanded] = useState(true)
   const model = artifactCardModel(block)
   const args = artifactArgs(block)
   const done = 'kind' in block
   const op = (model === null ? args?.op : model.view.op) ?? (args?.op ?? 'unknown')
+  const [expanded, setExpanded] = useState(op === 'create' || op === 'patch')
   const id = model !== null && 'id' in model.view ? model.view.id : args?.id
   const title = rowTitle(op, id)
   const summary = model !== null && 'id' in model.view && model.view.op === 'create'

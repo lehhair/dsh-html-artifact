@@ -3,8 +3,8 @@
 // semantics — every settled row renders the artifact as it was at THAT call:
 // a create row keeps its create-time html (later patch rows never touch it),
 // a patch row shows the patched html DIRECTLY (no diff, no cross-row sync).
-// Rows are expanded by default. The block fixtures mirror the runtime's
-// frozen nodes.
+// Only the rendering ops (create/patch) expand by default. The block fixtures
+// mirror the runtime's frozen nodes.
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -46,6 +46,13 @@ function settled(args: unknown, resultView: unknown): ToolResultNode {
 
 function rowProps(block: ToolCallBlock): ArtifactRowProps {
   return { callId: 'c1', toolName: 'artifact', block, openFile: () => {}, inspect: undefined, cwd: undefined }
+}
+
+/** Expand the disclosure row (read/destroy/list rows start collapsed). */
+function openRow(container: HTMLElement): void {
+  const row = container.querySelector('[data-disclosure-row]')
+  if (row === null) throw new Error('no disclosure row')
+  fireEvent.click(row)
 }
 
 describe('artifactCardModel', () => {
@@ -135,11 +142,14 @@ describe('timeline snapshots', () => {
 })
 
 describe('read, destroy and list rows', () => {
-  it('renders the read source in a capped view', () => {
+  it('renders the read source in a capped view (collapsed by default)', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'read', id: 'art-r1' },
       { card: 'artifact', op: 'read', id: 'art-r1', revision: 3, html: '<i>raw &amp; source</i>' },
     ))} />)
+    // read is not a rendering op: collapsed until clicked.
+    expect(container.querySelector('[data-artifact-source]')).toBeNull()
+    openRow(container)
     const pre = container.querySelector('[data-artifact-source]')
     expect(pre).not.toBeNull()
     // The source renders escaped as text (never as markup): the <i> tags show
@@ -149,15 +159,17 @@ describe('read, destroy and list rows', () => {
     expect(pre!.textContent).toContain('raw')
   })
 
-  it('renders a destroy note', () => {
+  it('renders a destroy note (collapsed by default)', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'destroy', id: 'art-d1' },
       { card: 'artifact', op: 'destroy', id: 'art-d1' },
     ))} />)
+    expect(container.querySelector('[data-artifact-row]')!.textContent).not.toContain('closed')
+    openRow(container)
     expect(container.querySelector('[data-artifact-row]')!.textContent).toContain('closed')
   })
 
-  it('renders the list summaries', () => {
+  it('renders the list summaries (collapsed by default)', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'list' },
       {
@@ -168,6 +180,8 @@ describe('read, destroy and list rows', () => {
         ],
       },
     ))} />)
+    expect(container.querySelector('[data-artifact-list]')).toBeNull()
+    openRow(container)
     const list = container.querySelector('[data-artifact-list]')
     expect(list).not.toBeNull()
     expect(list!.textContent).toContain('art-a1')
@@ -175,11 +189,13 @@ describe('read, destroy and list rows', () => {
     expect(list!.textContent).toContain('art-b2')
   })
 
-  it('renders an empty-list note', () => {
+  it('renders an empty-list note (collapsed by default)', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'list' },
       { card: 'artifact', op: 'list', artifacts: [] },
     ))} />)
+    expect(container.querySelector('[data-artifact-list]')).toBeNull()
+    openRow(container)
     expect(container.querySelector('[data-artifact-list]')!.textContent).toContain('no HTML artifacts')
   })
 })
