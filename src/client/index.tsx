@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { ArtifactRow } from './ArtifactRow.tsx'
 import { artifactDraftDefinition } from './stream/draft.ts'
 import { ArtifactDraftNodeView } from './stream/DraftSurface.tsx'
+import { initInteractionSubmit } from './stream/submit.ts'
 
 /** Required services: the slot registry and the conversation-node registry. */
 export const inject = ['slots', 'conversationEvents']
@@ -27,6 +28,10 @@ export function apply(ctx: ClientContext): void {
       key: 'artifact',
     }, ArtifactRow)
   })
+  // The interaction-submission bridge (tracks the current session so artifact
+  // interaction submits land in the right conversation); lives for the plugin
+  // lifetime.
+  ctx.effect(() => initInteractionSubmit(ctx), 'dsh-html-artifact: interaction submit bridge')
   // The streaming draft Definition: lives for this plugin's lifetime and is
   // removed automatically on unload (the registry wraps it in a ctx effect).
   ctx.conversationEvents.register(artifactDraftDefinition)

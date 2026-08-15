@@ -139,6 +139,15 @@ describe('timeline snapshots', () => {
     expect(container.querySelector('iframe')).toBeNull()
     expect(container.querySelector('pre')).not.toBeNull()
   })
+
+  it('renders the interaction submit button on the preview toolbar', () => {
+    const { container } = render(<ArtifactRow {...rowProps(settled(
+      { op: 'create', html: '<input name="x">' },
+      { card: 'artifact', op: 'create', id: 'art-s5', revision: 1, html: '<input name="x">' },
+    ))} />)
+    const buttons = Array.from(container.querySelectorAll('button'))
+    expect(buttons.some(button => button.textContent?.includes('Submit interaction'))).toBe(true)
+  })
 })
 
 describe('read, destroy and list rows', () => {

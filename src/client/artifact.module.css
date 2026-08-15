@@ -47,6 +47,11 @@
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
 
+.toolButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .frame {
   width: 100%;
   border: 1px solid var(--border);

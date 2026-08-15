@@ -16,7 +16,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  DisclosureRow, IconCodeOutline16, IconCopyOutline16, IconEditOutline16, IconInspectOutline12, StateDot, writeClipboard,
+  DisclosureRow, IconCodeOutline16, IconCopyOutline16, IconEditOutline16, IconInspectOutline12, IconSendOutline16, StateDot, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // The stock row's stylesheet, imported through the package's exported src
 // subpath and inlined — the row renders with the exact stock chrome.
@@ -24,6 +24,7 @@ import rowCss from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/T
 import { artifactArgs, artifactCardModel, type ArtifactSummaryView, type ToolCallOwnerProps } from './contract.ts'
 import { buildSandboxedHtmlDocument, hostArtifactTheme, type ArtifactTheme } from './sandbox.ts'
 import { DraftSurface } from './stream/DraftSurface.tsx'
+import { submitInteraction } from './stream/submit.ts'
 import css from './artifact.module.css'
 
 /** Row state semantic; colors self-supplied via StateDot. */
@@ -37,6 +38,32 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/** Request the sandbox surface to collect its interaction data (bridge
+ *  postMessage round-trip, bounded by a timeout). */
+function collectFromFrame(frame: HTMLIFrameElement, resizeId: string): Promise<unknown | null> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (value: unknown | null) => {
+      if (settled) return
+      settled = true
+      window.removeEventListener('message', onMessage)
+      window.clearTimeout(timer)
+      resolve(value)
+    }
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data
+      if (event.source !== frame.contentWindow) return
+      if (data === null || typeof data !== 'object') return
+      if ((data as { type?: unknown }).type !== 'dsh-artifact-collect-result') return
+      if ((data as { id?: unknown }).id !== resizeId) return
+      finish((data as { data?: unknown }).data ?? null)
+    }
+    const timer = window.setTimeout(() => finish(null), 2500)
+    window.addEventListener('message', onMessage)
+    frame.contentWindow?.postMessage({ type: 'dsh-artifact-collect', id: resizeId }, '*')
+  })
+}
+
 /** The sandboxed preview of ONE snapshot: an iframe built from the given html. */
 function ArtifactSurface({ id, title, revision, html }: {
   id: string
@@ -47,6 +74,7 @@ function ArtifactSurface({ id, title, revision, html }: {
   const [view, setView] = useState<'preview' | 'source'>('preview')
   const [height, setHeight] = useState(240)
   const [copied, setCopied] = useState(false)
+  const [submitState, setSubmitState] = useState<'idle' | 'collecting' | 'submitted' | 'error'>('idle')
   const [theme] = useState<ArtifactTheme>(hostArtifactTheme)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const resizeId = useId()
@@ -75,6 +103,22 @@ function ArtifactSurface({ id, title, revision, html }: {
     }
   }
 
+  const onSubmit = async () => {
+    const frame = frameRef.current
+    if (frame === null) return
+    setSubmitState('collecting')
+    const data = await collectFromFrame(frame, resizeId)
+    if (data === null) {
+      setSubmitState('error')
+      return
+    }
+    const ok = await submitInteraction(id, title, data)
+    setSubmitState(ok ? 'submitted' : 'error')
+    if (ok) {
+      window.setTimeout(() => setSubmitState('idle'), 2500)
+    }
+  }
+
   return (
     <div className={css.surface} data-artifact-surface="">
       <div className={css.toolbar}>
@@ -87,6 +131,13 @@ function ArtifactSurface({ id, title, revision, html }: {
         <button type="button" className={css.toolButton} onClick={onCopy}>
           <IconCopyOutline16 size={14} />
           {copied ? 'Copied' : 'Copy HTML'}
+        </button>
+        <button type="button" className={css.toolButton} onClick={onSubmit} disabled={submitState === 'collecting'}>
+          <IconSendOutline16 size={14} />
+          {submitState === 'collecting' ? 'Collecting…'
+            : submitState === 'submitted' ? 'Submitted ✓'
+              : submitState === 'error' ? 'Failed'
+                : 'Submit interaction'}
         </button>
       </div>
       {view === 'preview'

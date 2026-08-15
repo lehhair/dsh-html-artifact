@@ -8,6 +8,7 @@
  * cannot touch the host document.
  * @module
  */
+import { collectBridgeBody } from './stream/collect.ts'
 
 export type ArtifactTheme = 'light' | 'dark'
 
@@ -68,13 +69,20 @@ function measureScript(resizeId: string): string {
   return `<script>(function(){var id=${JSON.stringify(resizeId)};var send=function(){var body=document.body;if(!body){return}var root=body.getBoundingClientRect();var bottom=0;var nodes=body.querySelectorAll("*");for(var i=0;i<nodes.length;i+=1){var el=nodes[i];var tag=el.tagName;if(tag==="SCRIPT"||tag==="STYLE"||tag==="LINK"||tag==="META"){continue}var style=getComputedStyle(el);if(style.display==="none"||style.visibility==="hidden"||style.position==="fixed"){continue}var rect=el.getBoundingClientRect();bottom=Math.max(bottom,rect.bottom-root.top)}var height=Math.max(120,Math.ceil(bottom||body.scrollHeight));parent.postMessage({type:"dsh-artifact-resize",id:id,height:height},"*")};addEventListener("load",send);if(typeof ResizeObserver!=="undefined"){new ResizeObserver(send).observe(document.body)}requestAnimationFrame(send)})()</script>`
 }
 
+/** Collect handler: scans the artifact body on a `dsh-artifact-collect`
+ *  request and reports the interaction data back to the requester. */
+function collectScript(resizeId: string, collectBody: string): string {
+  return `<script>(function(){var id=${JSON.stringify(resizeId)};${collectBody}addEventListener("message",function(event){var d=event.data;if(d&&d.type==="dsh-artifact-collect"&&d.id===id){var data=collect(document.body);event.source.postMessage({type:"dsh-artifact-collect-result",id:id,data:data},"*")}})})()</script>`
+}
+
 /**
  * Build the srcdoc for one artifact preview: the artifact source merged into a
  * host-owned document (CSP head, theme variables, storage shim, theme and
- * measure bridges). The source is parsed with DOMParser so a `</body>` or
- * `<head>` inside it cannot break out of the wrapper structure.
+ * measure bridges, and the interaction-data collect bridge). The source is
+ * parsed with DOMParser so a `</body>` or `<head>` inside it cannot break out
+ * of the wrapper structure.
  * @param source - the artifact's HTML source.
- * @param resizeId - stable per-surface id echoed back by the measure bridge.
+ * @param resizeId - stable per-surface id echoed back by the bridges.
  * @param theme - initial host theme for the document.
  * @returns the complete standalone document string.
  */
@@ -83,6 +91,9 @@ export function buildSandboxedHtmlDocument(source: string, resizeId: string, the
   const securityHead = `<meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}"><meta name="viewport" content="width=device-width, initial-scale=1">`
   const themeHead = `<style id="dsh-artifact-theme">html,body{margin:0;overflow:hidden;background:transparent}${themeRootCss(theme)}</style>`
   doc.head.insertAdjacentHTML('afterbegin', `${securityHead}${themeHead}${storageShimScript()}`)
-  doc.body.insertAdjacentHTML('afterbegin', `${themeApplyScript(theme)}${measureScript(resizeId)}`)
+  doc.body.insertAdjacentHTML(
+    'afterbegin',
+    `${themeApplyScript(theme)}${measureScript(resizeId)}${collectScript(resizeId, collectBridgeBody())}`,
+  )
   return `<!doctype html>${doc.documentElement.outerHTML}`
 }
