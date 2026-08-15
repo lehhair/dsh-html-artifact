@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-// ArtifactRow: the `artifact` tool's atomic view — the create row's sandboxed
-// live preview (srcdoc carries the CSP head + the artifact html), the patch
-// row rendering BOTH the live surface and the applied old/new replacement, the
-// cross-call live update through the module store, the destroy/list/read
-// bodies, and the generic fallbacks for running/unknown calls. Rows are
-// expanded by default (the preview is the point), so bodies are visible
-// without a click. The block fixtures mirror the runtime's frozen nodes.
+// ArtifactRow: the `artifact` tool's atomic view with timeline-snapshot
+// semantics — every settled row renders the artifact as it was at THAT call:
+// a create row keeps its create-time html (later patch rows never touch it),
+// a patch row shows the patched html DIRECTLY (no diff, no cross-row sync).
+// Rows are expanded by default. The block fixtures mirror the runtime's
+// frozen nodes.
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -58,15 +57,14 @@ describe('artifactCardModel', () => {
   it('renders no body for a non-artifact view', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled({ op: 'create' }, { card: 'generic', title: 'x' }))} />)
     expect(container.querySelector('[data-artifact-surface]')).toBeNull()
-    expect(container.querySelector('[data-artifact-patch]')).toBeNull()
   })
 })
 
-describe('create row', () => {
-  it('is expanded by default and renders the sandboxed preview iframe with the CSP head and the artifact html', () => {
+describe('timeline snapshots', () => {
+  it('create row is expanded by default and renders its create-time html', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
-      { op: 'create', title: 'Demo', html: '<div>hi</div>' },
-      { card: 'artifact', op: 'create', id: 'art-demo1', revision: 1, title: 'Demo', html: '<div>hi</div>' },
+      { op: 'create', title: 'Demo', html: '<div>v1</div>' },
+      { card: 'artifact', op: 'create', id: 'art-s1', revision: 1, title: 'Demo', html: '<div>v1</div>' },
     ))} />)
     // No click: the row opens itself.
     const frame = container.querySelector('iframe') as HTMLIFrameElement | null
@@ -74,15 +72,48 @@ describe('create row', () => {
     expect(frame!.getAttribute('sandbox')).toBe('allow-scripts')
     const srcDoc = frame!.getAttribute('srcdoc') ?? ''
     expect(srcDoc).toContain('Content-Security-Policy')
-    expect(srcDoc).toContain('<div>hi</div>')
+    expect(srcDoc).toContain('<div>v1</div>')
     expect(container.textContent).toContain('rev 1')
     expect(container.textContent).toContain('Demo')
+  })
+
+  it('patch row renders the patched html DIRECTLY, with no diff', () => {
+    const { container } = render(<ArtifactRow {...rowProps(settled(
+      { op: 'patch', id: 'art-s2', old_string: 'v1', new_string: 'v2' },
+      { card: 'artifact', op: 'patch', id: 'art-s2', revision: 2, html: '<div>v2</div>', applied: 1 },
+    ))} />)
+    const frame = container.querySelector('iframe') as HTMLIFrameElement | null
+    expect(frame).not.toBeNull()
+    expect(frame!.getAttribute('srcdoc') ?? '').toContain('<div>v2</div>')
+    // No old/new diff anywhere in the row.
+    expect(container.textContent).not.toContain('occurrence replaced')
+    expect(container.querySelector('[data-artifact-patch]')).toBeNull()
+    expect(container.textContent).toContain('rev 2')
+  })
+
+  it('a later patch row never rewrites an earlier create row (each row keeps its snapshot)', () => {
+    const { container } = render(<ArtifactRow {...rowProps(settled(
+      { op: 'create', html: '<div>v1</div>' },
+      { card: 'artifact', op: 'create', id: 'art-s3', revision: 1, html: '<div>v1</div>' },
+    ))} />)
+    const createFrame = container.querySelector('iframe') as HTMLIFrameElement
+    expect(createFrame.getAttribute('srcdoc')).toContain('<div>v1</div>')
+
+    // A second, independent row for the same artifact id patches it.
+    render(<ArtifactRow {...rowProps(settled(
+      { op: 'patch', id: 'art-s3', old_string: 'v1', new_string: 'v2' },
+      { card: 'artifact', op: 'patch', id: 'art-s3', revision: 2, html: '<div>v2</div>', applied: 1 },
+    ))} />)
+
+    // The create row's iframe still shows v1; the patch row shows v2.
+    expect(createFrame.getAttribute('srcdoc')).toContain('<div>v1</div>')
+    expect(createFrame.getAttribute('srcdoc')).not.toContain('<div>v2</div>')
   })
 
   it('toggle button switches between preview and source', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'create', html: '<p>x</p>' },
-      { card: 'artifact', op: 'create', id: 'art-demo2', revision: 1, html: '<p>x</p>' },
+      { card: 'artifact', op: 'create', id: 'art-s4', revision: 1, html: '<p>x</p>' },
     ))} />)
     const frame = container.querySelector('iframe')
     expect(frame).not.toBeNull()
@@ -92,58 +123,6 @@ describe('create row', () => {
     fireEvent.click(sourceButton!)
     expect(container.querySelector('iframe')).toBeNull()
     expect(container.querySelector('pre')).not.toBeNull()
-  })
-})
-
-describe('patch row and the live cross-call update', () => {
-  it('renders BOTH the live surface and the applied old/new replacement', () => {
-    const { container } = render(<ArtifactRow {...rowProps(settled(
-      { op: 'patch', id: 'art-p1', old_string: 'hello', new_string: 'world' },
-      { card: 'artifact', op: 'patch', id: 'art-p1', revision: 2, html: '<div>world</div>', applied: 1 },
-    ))} />)
-    const patch = container.querySelector('[data-artifact-patch]')
-    expect(patch).not.toBeNull()
-    expect(patch!.textContent).toContain('revision 2')
-    expect(patch!.textContent).toContain('1 occurrence replaced')
-    expect(patch!.textContent).toContain('hello')
-    expect(patch!.textContent).toContain('world')
-    // The same row also renders the live preview, showing the patched html.
-    const frame = container.querySelector('iframe') as HTMLIFrameElement | null
-    expect(frame).not.toBeNull()
-    expect(frame!.getAttribute('srcdoc') ?? '').toContain('<div>world</div>')
-  })
-
-  it('updates the create row\'s live preview when a later patch call settles', () => {
-    const createBlock = settled(
-      { op: 'create', html: '<div>v1</div>' },
-      { card: 'artifact', op: 'create', id: 'art-live1', revision: 1, html: '<div>v1</div>' },
-    )
-    const { container } = render(<ArtifactRow {...rowProps(createBlock)} />)
-    const before = (container.querySelector('iframe') as HTMLIFrameElement).getAttribute('srcdoc') ?? ''
-    expect(before).toContain('<div>v1</div>')
-
-    // A second, independent row for the same artifact id patches it; its mount
-    // effect feeds the module store, which re-renders every surface for the id.
-    render(<ArtifactRow {...rowProps(settled(
-      { op: 'patch', id: 'art-live1', old_string: 'v1', new_string: 'v2' },
-      { card: 'artifact', op: 'patch', id: 'art-live1', revision: 2, html: '<div>v2</div>', applied: 1 },
-    ))} />)
-
-    const after = (container.querySelector('iframe') as HTMLIFrameElement).getAttribute('srcdoc') ?? ''
-    expect(after).toContain('<div>v2</div>')
-    expect(after).not.toContain('<div>v1</div>')
-  })
-
-  it('shows the closed state after a destroy call for the same id', () => {
-    const { container } = render(<ArtifactRow {...rowProps(settled(
-      { op: 'create', html: '<div>x</div>' },
-      { card: 'artifact', op: 'create', id: 'art-gone1', revision: 1, html: '<div>x</div>' },
-    ))} />)
-    render(<ArtifactRow {...rowProps(settled(
-      { op: 'destroy', id: 'art-gone1' },
-      { card: 'artifact', op: 'destroy', id: 'art-gone1' },
-    ))} />)
-    expect(container.querySelector('[data-artifact-row]')!.textContent).toContain('Artifact closed.')
   })
 })
 
