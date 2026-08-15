@@ -71,6 +71,12 @@
   word-break: break-word;
 }
 
+.patchWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .patch {
   display: flex;
   flex-direction: column;

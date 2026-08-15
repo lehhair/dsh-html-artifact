@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 // ArtifactRow: the `artifact` tool's atomic view — the create row's sandboxed
 // live preview (srcdoc carries the CSP head + the artifact html), the patch
-// row's old/new diff, the cross-call live update through the module store, the
-// destroy/list/read bodies, and the generic fallbacks for running/unknown
-// calls. The block fixtures mirror the runtime's frozen conversation nodes.
+// row rendering BOTH the live surface and the applied old/new replacement, the
+// cross-call live update through the module store, the destroy/list/read
+// bodies, and the generic fallbacks for running/unknown calls. Rows are
+// expanded by default (the preview is the point), so bodies are visible
+// without a click. The block fixtures mirror the runtime's frozen nodes.
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { RunningToolCall, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { ArtifactRow, type ArtifactRowProps } from '../src/client/ArtifactRow.tsx'
 
@@ -47,43 +49,34 @@ function rowProps(block: ToolCallBlock): ArtifactRowProps {
   return { callId: 'c1', toolName: 'artifact', block, openFile: () => {}, inspect: undefined, cwd: undefined }
 }
 
-/** Expand the disclosure row (children render only while open). */
-function openRow(container: HTMLElement): void {
-  const row = container.querySelector('[data-disclosure-row]')
-  if (row === null) throw new Error('no disclosure row')
-  fireEvent.click(row)
-}
-
 describe('artifactCardModel', () => {
-  it('returns null for a running call (result-only card)', () => {
+  it('renders no body for a running call (result-only card)', () => {
     const { container } = render(<ArtifactRow {...rowProps(running({ op: 'create' }))} />)
     expect(container.querySelector('[data-artifact-surface]')).toBeNull()
   })
 
-  it('returns null and renders no body for a non-artifact view', () => {
+  it('renders no body for a non-artifact view', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled({ op: 'create' }, { card: 'generic', title: 'x' }))} />)
-    openRow(container)
     expect(container.querySelector('[data-artifact-surface]')).toBeNull()
     expect(container.querySelector('[data-artifact-patch]')).toBeNull()
   })
 })
 
 describe('create row', () => {
-  it('renders the sandboxed preview iframe with the CSP head and the artifact html', () => {
+  it('is expanded by default and renders the sandboxed preview iframe with the CSP head and the artifact html', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'create', title: 'Demo', html: '<div>hi</div>' },
       { card: 'artifact', op: 'create', id: 'art-demo1', revision: 1, title: 'Demo', html: '<div>hi</div>' },
     ))} />)
-    openRow(container)
+    // No click: the row opens itself.
     const frame = container.querySelector('iframe') as HTMLIFrameElement | null
     expect(frame).not.toBeNull()
     expect(frame!.getAttribute('sandbox')).toBe('allow-scripts')
     const srcDoc = frame!.getAttribute('srcdoc') ?? ''
     expect(srcDoc).toContain('Content-Security-Policy')
     expect(srcDoc).toContain('<div>hi</div>')
-    expect(screen.getByText('rev 1')).not.toBeNull()
-    // The title appears twice: as the collapsed row summary and the surface toolbar.
-    expect(screen.getAllByText('Demo').length).toBeGreaterThan(0)
+    expect(container.textContent).toContain('rev 1')
+    expect(container.textContent).toContain('Demo')
   })
 
   it('toggle button switches between preview and source', () => {
@@ -91,27 +84,33 @@ describe('create row', () => {
       { op: 'create', html: '<p>x</p>' },
       { card: 'artifact', op: 'create', id: 'art-demo2', revision: 1, html: '<p>x</p>' },
     ))} />)
-    openRow(container)
-    expect(container.querySelector('iframe')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Source/ }))
-    expect(container.querySelector('pre')).not.toBeNull()
+    const frame = container.querySelector('iframe')
+    expect(frame).not.toBeNull()
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const sourceButton = buttons.find(button => button.textContent?.includes('Source'))
+    expect(sourceButton).not.toBeUndefined()
+    fireEvent.click(sourceButton!)
     expect(container.querySelector('iframe')).toBeNull()
+    expect(container.querySelector('pre')).not.toBeNull()
   })
 })
 
 describe('patch row and the live cross-call update', () => {
-  it('renders the applied old/new replacement', () => {
+  it('renders BOTH the live surface and the applied old/new replacement', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'patch', id: 'art-p1', old_string: 'hello', new_string: 'world' },
       { card: 'artifact', op: 'patch', id: 'art-p1', revision: 2, html: '<div>world</div>', applied: 1 },
     ))} />)
-    openRow(container)
     const patch = container.querySelector('[data-artifact-patch]')
     expect(patch).not.toBeNull()
     expect(patch!.textContent).toContain('revision 2')
     expect(patch!.textContent).toContain('1 occurrence replaced')
     expect(patch!.textContent).toContain('hello')
     expect(patch!.textContent).toContain('world')
+    // The same row also renders the live preview, showing the patched html.
+    const frame = container.querySelector('iframe') as HTMLIFrameElement | null
+    expect(frame).not.toBeNull()
+    expect(frame!.getAttribute('srcdoc') ?? '').toContain('<div>world</div>')
   })
 
   it('updates the create row\'s live preview when a later patch call settles', () => {
@@ -120,12 +119,11 @@ describe('patch row and the live cross-call update', () => {
       { card: 'artifact', op: 'create', id: 'art-live1', revision: 1, html: '<div>v1</div>' },
     )
     const { container } = render(<ArtifactRow {...rowProps(createBlock)} />)
-    openRow(container)
     const before = (container.querySelector('iframe') as HTMLIFrameElement).getAttribute('srcdoc') ?? ''
     expect(before).toContain('<div>v1</div>')
 
     // A second, independent row for the same artifact id patches it; its mount
-    // effect feeds the module store, which re-renders the create row's surface.
+    // effect feeds the module store, which re-renders every surface for the id.
     render(<ArtifactRow {...rowProps(settled(
       { op: 'patch', id: 'art-live1', old_string: 'v1', new_string: 'v2' },
       { card: 'artifact', op: 'patch', id: 'art-live1', revision: 2, html: '<div>v2</div>', applied: 1 },
@@ -141,7 +139,6 @@ describe('patch row and the live cross-call update', () => {
       { op: 'create', html: '<div>x</div>' },
       { card: 'artifact', op: 'create', id: 'art-gone1', revision: 1, html: '<div>x</div>' },
     ))} />)
-    openRow(container)
     render(<ArtifactRow {...rowProps(settled(
       { op: 'destroy', id: 'art-gone1' },
       { card: 'artifact', op: 'destroy', id: 'art-gone1' },
@@ -156,7 +153,6 @@ describe('read, destroy and list rows', () => {
       { op: 'read', id: 'art-r1' },
       { card: 'artifact', op: 'read', id: 'art-r1', revision: 3, html: '<i>raw &amp; source</i>' },
     ))} />)
-    openRow(container)
     const pre = container.querySelector('[data-artifact-source]')
     expect(pre).not.toBeNull()
     // The source renders escaped as text (never as markup): the <i> tags show
@@ -171,7 +167,6 @@ describe('read, destroy and list rows', () => {
       { op: 'destroy', id: 'art-d1' },
       { card: 'artifact', op: 'destroy', id: 'art-d1' },
     ))} />)
-    openRow(container)
     expect(container.querySelector('[data-artifact-row]')!.textContent).toContain('closed')
   })
 
@@ -186,7 +181,6 @@ describe('read, destroy and list rows', () => {
         ],
       },
     ))} />)
-    openRow(container)
     const list = container.querySelector('[data-artifact-list]')
     expect(list).not.toBeNull()
     expect(list!.textContent).toContain('art-a1')
@@ -199,7 +193,6 @@ describe('read, destroy and list rows', () => {
       { op: 'list' },
       { card: 'artifact', op: 'list', artifacts: [] },
     ))} />)
-    openRow(container)
     expect(container.querySelector('[data-artifact-list]')!.textContent).toContain('no HTML artifacts')
   })
 })

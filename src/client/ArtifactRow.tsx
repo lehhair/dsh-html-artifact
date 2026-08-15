@@ -185,9 +185,11 @@ function rowTitle(op: string, id: string | undefined): string {
   }
 }
 
-/** The artifact row: stock ToolRow chrome with the op-specific body. */
+/** The artifact row: stock ToolRow chrome with the op-specific body. Expanded
+ *  by default: the live preview is the point of the tool, so a settled
+ *  artifact row opens to show it without a click. */
 export function ArtifactRow({ toolName, block, inspect }: ArtifactRowProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const model = artifactCardModel(block)
   const args = artifactArgs(block)
   const done = 'kind' in block
@@ -223,12 +225,18 @@ export function ArtifactRow({ toolName, block, inspect }: ArtifactRowProps) {
     switch (view.op) {
       case 'create': return <ArtifactSurface id={view.id} />
       case 'patch': return (
-        <PatchDiff
-          revision={view.revision}
-          applied={view.applied ?? 1}
-          oldString={args?.oldString ?? ''}
-          newString={args?.newString ?? ''}
-        />
+        <div className={css.patchWrap}>
+          {/* The live surface renders HERE, so the patch row itself shows the
+              updated artifact — no scrolling back to the create row. The
+              module store keeps every surface for the id in sync. */}
+          <ArtifactSurface id={view.id} />
+          <PatchDiff
+            revision={view.revision}
+            applied={view.applied ?? 1}
+            oldString={args?.oldString ?? ''}
+            newString={args?.newString ?? ''}
+          />
+        </div>
       )
       case 'read': return <SourceView html={view.html} truncated={view.truncated === true} />
       case 'destroy': return <div className={css.closed}>Artifact {view.id} closed.</div>
