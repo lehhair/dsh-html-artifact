@@ -69,6 +69,11 @@
   padding-top: 8px;
 }
 
+.submitBar .toolbarTitle {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .source {
   margin: 0;
   padding: 10px 12px;

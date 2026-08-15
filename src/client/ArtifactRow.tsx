@@ -121,10 +121,6 @@ function ArtifactSurface({ id, title, revision, html }: {
 
   return (
     <div className={css.surface} data-artifact-surface="">
-      <div className={css.toolbar}>
-        <span className={css.toolbarTitle}>{title ?? `Artifact ${id}`}</span>
-        <span className={css.badge}>rev {revision}</span>
-      </div>
       {view === 'preview'
         ? <iframe
             ref={frameRef}
@@ -135,19 +131,22 @@ function ArtifactSurface({ id, title, revision, html }: {
             title={`HTML artifact ${id}`}
           />
         : <pre className={css.source}>{html}</pre>}
-      {/* The action row sits BELOW the rendered content: Source/Copy for the
-          artifact, and the interaction submit — the user interacts with the
-          artifact first, then acts on it. */}
-      {view === 'preview' && (
-        <div className={css.submitBar} data-artifact-actions="">
-          <button type="button" className={css.toolButton} onClick={() => setView(v => v === 'preview' ? 'source' : 'preview')}>
-            <IconCodeOutline16 size={14} />
-            {view === 'preview' ? 'Source' : 'Preview'}
-          </button>
-          <button type="button" className={css.toolButton} onClick={onCopy}>
-            <IconCopyOutline16 size={14} />
-            {copied ? 'Copied' : 'Copy HTML'}
-          </button>
+      {/* The action row sits BELOW the rendered content and is ALWAYS present
+          (preview or source), so Source↔Preview is always recoverable: title,
+          revision, the view toggle, copy, and the interaction submit (submit
+          only exists in the interactive preview). */}
+      <div className={css.submitBar} data-artifact-actions="">
+        <span className={css.toolbarTitle}>{title ?? `Artifact ${id}`}</span>
+        <span className={css.badge}>rev {revision}</span>
+        <button type="button" className={css.toolButton} onClick={() => setView(v => v === 'preview' ? 'source' : 'preview')}>
+          <IconCodeOutline16 size={14} />
+          {view === 'preview' ? 'Source' : 'Preview'}
+        </button>
+        <button type="button" className={css.toolButton} onClick={onCopy}>
+          <IconCopyOutline16 size={14} />
+          {copied ? 'Copied' : 'Copy HTML'}
+        </button>
+        {view === 'preview' && (
           <button type="button" className={css.toolButton} onClick={onSubmit} disabled={submitState === 'collecting'}>
             <IconSendOutline16 size={14} />
             {submitState === 'collecting' ? 'Collecting…'
@@ -155,8 +154,8 @@ function ArtifactSurface({ id, title, revision, html }: {
                 : submitState === 'error' ? 'Failed'
                   : 'Submit interaction'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

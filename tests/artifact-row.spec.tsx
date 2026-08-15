@@ -125,28 +125,38 @@ describe('timeline snapshots', () => {
     expect(createFrame.getAttribute('srcdoc')).not.toContain('<div>v2</div>')
   })
 
-  it('toggle button switches between preview and source', () => {
+  it('toggle button switches between preview and source; the action row persists with Preview', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'create', html: '<p>x</p>' },
       { card: 'artifact', op: 'create', id: 'art-s4', revision: 1, html: '<p>x</p>' },
     ))} />)
     const frame = container.querySelector('iframe')
     expect(frame).not.toBeNull()
-    const buttons = Array.from(container.querySelectorAll('button'))
-    const sourceButton = buttons.find(button => button.textContent?.includes('Source'))
+    const actions = container.querySelector('[data-artifact-actions]') as HTMLElement
+    expect(actions).not.toBeNull()
+    const sourceButton = Array.from(actions.querySelectorAll('button')).find(button => button.textContent?.includes('Source'))
     expect(sourceButton).not.toBeUndefined()
     fireEvent.click(sourceButton!)
     expect(container.querySelector('iframe')).toBeNull()
     expect(container.querySelector('pre')).not.toBeNull()
+    // The action row persists in source view with the Preview button to return.
+    const actionsAfter = container.querySelector('[data-artifact-actions]') as HTMLElement
+    expect(actionsAfter).not.toBeNull()
+    const previewButton = Array.from(actionsAfter.querySelectorAll('button')).find(button => button.textContent?.includes('Preview'))
+    expect(previewButton).not.toBeUndefined()
+    fireEvent.click(previewButton!)
+    expect(container.querySelector('iframe')).not.toBeNull()
   })
 
-  it('renders Source, Copy, and Submit interaction BELOW the preview in one action row', () => {
+  it('renders title, revision, Source, Copy, and Submit BELOW the preview in one action row', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
-      { op: 'create', html: '<input name="x">' },
-      { card: 'artifact', op: 'create', id: 'art-s5', revision: 1, html: '<input name="x">' },
+      { op: 'create', title: 'Demo', html: '<input name="x">' },
+      { card: 'artifact', op: 'create', id: 'art-s5', revision: 1, title: 'Demo', html: '<input name="x">' },
     ))} />)
     const actions = container.querySelector('[data-artifact-actions]')
     expect(actions).not.toBeNull()
+    expect(actions!.textContent).toContain('Demo')
+    expect(actions!.textContent).toContain('rev 1')
     const labels = Array.from(actions!.querySelectorAll('button')).map(button => button.textContent ?? '')
     expect(labels.some(text => text.includes('Source'))).toBe(true)
     expect(labels.some(text => text.includes('Copy HTML'))).toBe(true)
