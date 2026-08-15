@@ -148,7 +148,11 @@ export function apply(ctx: Context, config: Config = {}): void {
       + 'rendering IS the answer to the user, not a summary of it. After a successful create/patch, do NOT write '
       + 'explanatory prose describing what you made; end the turn with at most a single short closing line (or nothing) '
       + 'unless the user explicitly asked for an explanation. Only `read`/`list` results (which return source text) '
-      + 'may warrant a brief prose response.',
+      + 'may warrant a brief prose response. '
+      + 'INTERACTION-DATA PROTOCOL: when the artifact has internal state the user will interact with (game score, '
+      + 'counters, selections, results), expose it as `window.__dshArtifactData = { ... }` — a JSON value the artifact '
+      + 'updates as the state changes. The GUI\'s submit button collects it alongside form controls and button clicks, '
+      + 'so you can read what the user actually did inside the artifact.',
     parameters: {
       op: {
         type: 'string', required: true,

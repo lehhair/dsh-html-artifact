@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// Interaction collection: scanning form controls inside an artifact root and
-// honoring the explicit __dshArtifactData protocol.
+// Interaction collection: form-control scanning, the explicit
+// __dshArtifactData protocol, and bridge-tracked button clicks.
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { collectBridgeBody, collectInteractionData } from '../src/client/stream/collect.ts'
+import { clickLabel, collectBridgeBody, collectInteractionData, recordClick } from '../src/client/stream/collect.ts'
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -63,10 +63,46 @@ describe('collectInteractionData', () => {
   it('returns empty fields for a null root', () => {
     expect(collectInteractionData(null)).toEqual({ fields: [] })
   })
+
+  it('folds a bridge-tracked click tally into the payload', () => {
+    document.body.innerHTML = '<button>New Game</button><button data-artifact-action="move">→</button>'
+    const clicks = { 'New Game': 2, move: 5 }
+    expect(collectInteractionData(document.body, clicks)).toEqual({
+      fields: [],
+      clicks: { 'New Game': 2, move: 5 },
+    })
+  })
+})
+
+describe('clickLabel and recordClick', () => {
+  it('labels a click by data-artifact-action first, then text, then tag', () => {
+    const withAction = document.createElement('button')
+    withAction.setAttribute('data-artifact-action', 'move')
+    expect(clickLabel(withAction)).toBe('move')
+
+    const withText = document.createElement('button')
+    withText.textContent = 'New Game'
+    expect(clickLabel(withText)).toBe('New Game')
+
+    const bare = document.createElement('a')
+    expect(clickLabel(bare)).toBe('a')
+  })
+
+  it('tallies repeated clicks on the same label', () => {
+    const tally: Record<string, number> = {}
+    const button = document.createElement('button')
+    button.textContent = 'Retry'
+    recordClick(tally, button)
+    recordClick(tally, button)
+    expect(tally).toEqual({ Retry: 2 })
+  })
 })
 
 describe('collectBridgeBody', () => {
-  it('embeds the collect function into the bridge script source', () => {
-    expect(collectBridgeBody()).toContain('var collect =')
+  it('embeds the click tracker and the collect wrapper', () => {
+    const body = collectBridgeBody()
+    expect(body).toContain('recordClick')
+    expect(body).toContain('document.addEventListener("click"')
+    expect(body).toContain('var collect = function(root)')
   })
 })

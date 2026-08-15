@@ -31,6 +31,18 @@ dsh plugin --profile web add "https://github.com/lehhair/dsh-html-artifact/relea
 
 安全边界：预览在 `srcdoc` iframe 中，CSP `default-src 'none'`（脚本/样式允许内联，外部 https/http 资源允许），iframe 无 `allow-same-origin`（不透明源），artifact 脚本无法触达宿主文档；localStorage/sessionStorage 被内存 shim 替代。
 
+## 交互数据提交
+
+预览底部 **Submit interaction** 按钮会把用户在 artifact 内的交互数据注入当前会话（`Agent.followup`，agent 立即读取分析）。收集三层：
+
+1. **显式协议（推荐，游戏/计数器等内部状态）**：artifact 脚本把值得提交的状态写成 JSON 值并随状态变化更新：
+   ```js
+   window.__dshArtifactData = { score: currentScore, moves: moves }
+   ```
+   工具描述里已内置该指令，模型生成带内部状态的 artifact 时会自动写。
+2. **表单控件（自动）**：`input` / `textarea` / `select` / `checkbox` / `radio` 的当前值按 name/id 收集。
+3. **按钮点击（自动）**：点击过的按钮（`data-artifact-action` 优先，否则按钮文本）与次数自动记录。
+
 ## 开发
 
 ```sh

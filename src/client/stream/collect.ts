@@ -2,12 +2,16 @@
  * Interactive-data collection for artifact surfaces. The artifact html runs in
  * a sandboxed iframe (opaque origin), so the host cannot read its DOM; the
  * bridge script inside the surface collects on a postMessage request and
- * reports back. The scan logic lives HERE as a pure function and is embedded
- * into the bridge script via `Function.prototype.toString` — one source of
- * truth for the in-iframe and the unit-tested implementations.
+ * reports back. The scan and tracking logic lives HERE as pure functions and
+ * is embedded into the bridge script via `Function.prototype.toString` — one
+ * source of truth for the in-iframe and the unit-tested implementations.
  *
- * Collection prefers an explicit protocol (`window.__dshArtifactData`), then
- * falls back to scanning interactive form controls inside the artifact root.
+ * Collection layers:
+ * 1. Explicit protocol: `window.__dshArtifactData` — the artifact's own JSON
+ *    value (score, selections, counters). The tool description instructs
+ *    models to expose it for artifacts with internal state.
+ * 2. Form controls: current values of input/textarea/select (automatic).
+ * 3. Button clicks: labels + click counts tracked by the bridge (automatic).
  * @module
  */
 
@@ -27,10 +31,37 @@ export interface CollectedData {
   artifactData?: unknown
   /** Scanned form-control values, in document order. */
   fields: CollectedField[]
+  /** Button click tallies by label, when the bridge recorded any. */
+  clicks?: Record<string, number>
 }
 
-/** Scan one artifact root for interactive controls and their current values. */
-export function collectInteractionData(root: Element | null): CollectedData {
+/** Derive a stable click label from a clicked interactive element. */
+export function clickLabel(target: Element): string {
+  const action = target.getAttribute('data-artifact-action')
+  if (action !== null && action.trim() !== '') return action.trim()
+  const text = (target.textContent ?? '').trim().slice(0, 40)
+  if (text !== '') return text
+  return target.tagName.toLowerCase()
+}
+
+/** Record one click into a label→count tally (mutates and returns the tally). */
+export function recordClick(tally: Record<string, number>, target: Element): Record<string, number> {
+  const label = clickLabel(target)
+  tally[label] = (tally[label] ?? 0) + 1
+  return tally
+}
+
+/**
+ * Scan one artifact root for interactive controls and their current values,
+ * layered over the explicit protocol and any bridge-tracked click tally.
+ * @param root - the artifact body (null-safe).
+ * @param clicks - button click tally tracked by the bridge, if any.
+ * @returns the collected payload.
+ */
+export function collectInteractionData(
+  root: Element | null,
+  clicks?: Record<string, number> | undefined,
+): CollectedData {
   const explicit = typeof window !== 'undefined'
     ? (window as unknown as { __dshArtifactData?: unknown }).__dshArtifactData
     : undefined
@@ -59,11 +90,29 @@ export function collectInteractionData(root: Element | null): CollectedData {
       }
     }
   }
-  return { ...explicit === undefined ? {} : { artifactData: explicit }, fields }
+  return {
+    ...explicit === undefined ? {} : { artifactData: explicit },
+    fields,
+    ...clicks === undefined ? {} : { clicks },
+  }
 }
 
-/** Build the bridge-script source for the surface documents: one embedded
- *  copy of the collect function, kept identical to the unit-tested one. */
+/** Build the bridge-script source for the surface documents: the embedded
+ *  pure functions, the capture-phase click tracker, and a `collect` wrapper
+ *  that folds the tracked clicks into the collected payload. */
 export function collectBridgeBody(): string {
-  return `var collect = ${collectInteractionData.toString()};`
+  return [
+    `var clickLabel = ${clickLabel.toString()};`,
+    `var recordClick = ${recordClick.toString()};`,
+    `var clicks = {};`,
+    `document.addEventListener("click", function(event){`,
+    `  var t = event.target;`,
+    `  if (!(t instanceof Element)) return;`,
+    `  var el = t.closest ? t.closest('button, [role="button"], a, [data-artifact-action]') : null;`,
+    `  if (!el) return;`,
+    `  recordClick(clicks, el);`,
+    `}, true);`,
+    `var collectImpl = ${collectInteractionData.toString()};`,
+    `var collect = function(root) { return collectImpl(root, clicks); };`,
+  ].join('\n')
 }
