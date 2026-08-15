@@ -1,3 +1,5 @@
+[![dshfind](https://dshfind.com/api/badge/lehhair/dsh-html-artifact?lang=zh)](https://dshfind.com/zh/plugins/lehhair/dsh-html-artifact?ref=badge)
+
 # dsh-html-artifact
 
 HTML 实时渲染插件：模型通过专门的 `artifact` 工具创建/修补 HTML 文档，GUI 在沙箱 iframe 里**实时渲染**。核心区别：模型**打 patch**（`old_string`/`new_string`，和文件 `edit` 工具同一套语义），而不是每次重发整个 HTML —— 只传增量，预览原地更新。
