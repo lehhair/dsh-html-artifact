@@ -1,9 +1,9 @@
 /**
  * Interaction-submission bridge: delivers artifact interaction data collected
- * from a sandboxed surface into the CURRENT session as a user message, so the
- * agent can read and analyze what the user did inside the artifact. The bridge
- * is initialized once by the plugin apply with the sessions service and tracks
- * the current session id through the provide feed.
+ * from a sandboxed surface into the agent's NEXT request context through the
+ * host-side `/artifact-submit` slash command (never sent to the model as a
+ * chat message). The bridge is initialized once by the plugin apply with the
+ * sessions service and tracks the current session id through the provide feed.
  * @module
  */
 import type { ClientContext, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -33,24 +33,27 @@ export function initInteractionSubmit(ctx: ClientContext): () => void {
 }
 
 /**
- * Format one submission as the user message the agent reads: a short marker
- * plus the collected data as a JSON block.
+ * Format one submission as the `/artifact-submit` command line the host
+ * parses and records for the agent's next request.
  * @param artifactId - the artifact id.
  * @param title - optional artifact display title.
  * @param data - the collected interaction payload.
- * @returns the message text.
+ * @returns the command line.
  */
-export function formatSubmission(artifactId: string, title: string | undefined, data: unknown): string {
-  const label = title === undefined ? artifactId : `${artifactId}（${title}）`
-  return `[artifact 交互提交] 用户操作了 HTML artifact ${label} 并提交了交互数据，请读取并分析：\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``
+export function formatSubmissionCommand(artifactId: string, title: string | undefined, data: unknown): string {
+  return `/artifact-submit ${JSON.stringify({
+    id: artifactId,
+    ...title === undefined ? {} : { title },
+    data,
+  })}`
 }
 
 /**
- * Deliver one submission into the current session as a queued user message.
+ * Deliver one submission to the current session through the slash command.
  * @param artifactId - the artifact id.
  * @param title - optional artifact display title.
  * @param data - the collected interaction payload.
- * @returns whether the prompt was accepted.
+ * @returns whether the command matched and executed.
  */
 export async function submitInteraction(
   artifactId: string,
@@ -60,9 +63,6 @@ export async function submitInteraction(
   if (sessions === undefined || currentSessionId === undefined) return false
   const binding = sessions.binding(currentSessionId)
   if (binding === undefined) return false
-  const result = await binding.session.prompt(
-    [{ type: 'text', text: formatSubmission(artifactId, title, data) }],
-    'queue',
-  )
-  return result.ok === true
+  const result = await binding.session.command(formatSubmissionCommand(artifactId, title, data))
+  return result.ok === true && result.value.matched === true
 }

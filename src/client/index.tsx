@@ -14,8 +14,9 @@ import { artifactDraftDefinition } from './stream/draft.ts'
 import { ArtifactDraftNodeView } from './stream/DraftSurface.tsx'
 import { initInteractionSubmit } from './stream/submit.ts'
 
-/** Required services: the slot registry and the conversation-node registry. */
-export const inject = ['slots', 'conversationEvents']
+/** Required services: the slot registry, the conversation-node registry, and
+ *  the sessions service (interaction submission tracks the current session). */
+export const inject = ['slots', 'conversationEvents', 'sessions']
 
 /**
  * Mount the artifact rows and the streaming draft node.

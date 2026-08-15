@@ -60,6 +60,15 @@
   display: block;
 }
 
+.submitBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
 .source {
   margin: 0;
   padding: 10px 12px;

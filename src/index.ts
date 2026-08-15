@@ -15,15 +15,19 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-commands'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolResultView } from '@deepseek-ai/dsh-tools'
+import { parseSubmissionPayload, renderInteractionSubmission, renderSubmissionSummary } from './interaction.ts'
 import { ArtifactStore, truncateHtml, type ArtifactState } from './registry.ts'
 
 /** Cordis plugin name. */
 export const name = 'dsh-html-artifact'
-/** Required capability: the tool registry. */
-export const inject = ['tools']
+/** Required capabilities: the tool registry and the slash-command registry
+ *  (artifact interaction submission). */
+export const inject = ['tools', 'commands']
 
 /** Default cap on one stored artifact's HTML source. */
 export const DEFAULT_MAX_ARTIFACT_BYTES = 512 * 1024
@@ -102,6 +106,33 @@ function storeFor(agent: Agent | undefined): ArtifactStore {
 export function apply(ctx: Context, config: Config = {}): void {
   const maxArtifactBytes = config.maxArtifactBytes ?? DEFAULT_MAX_ARTIFACT_BYTES
   const maxReadBytes = config.maxReadBytes ?? DEFAULT_MAX_READ_BYTES
+
+  // Interaction submission: the browser half records user interaction data
+  // from a sandboxed artifact surface through this slash command (host-side,
+  // never sent to the model as a chat message). The submission is delivered
+  // as a plugin-source context message via Agent.followup — the same
+  // mechanism dsh uses for tool/context injection, but with an immediate
+  // wake: the agent reads the submitted data and answers right away.
+  ctx.commands.register({
+    name: 'artifact-submit',
+    description: 'Record user interaction data submitted from an HTML artifact preview.',
+    recordInput: false,
+    handler: (invocation) => {
+      const parsed = parseSubmissionPayload(invocation.rawInput)
+      if (!parsed.ok) return { kind: 'error', text: parsed.error }
+      const message = createUserMessage({
+        content: [{ type: 'text', text: renderInteractionSubmission(parsed.value) }],
+        source: {
+          kind: 'plugin',
+          plugin: name,
+          form: 'notice',
+          summary: renderSubmissionSummary(parsed.value),
+        },
+      })
+      invocation.agent.followup(message)
+      return { kind: 'success', text: `recorded interaction data for artifact ${parsed.value.id}` }
+    },
+  })
 
   ctx.tools.register(defineTool({
     name: 'artifact',

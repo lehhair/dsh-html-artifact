@@ -140,13 +140,24 @@ describe('timeline snapshots', () => {
     expect(container.querySelector('pre')).not.toBeNull()
   })
 
-  it('renders the interaction submit button on the preview toolbar', () => {
+  it('renders Source, Copy, and Submit interaction BELOW the preview in one action row', () => {
     const { container } = render(<ArtifactRow {...rowProps(settled(
       { op: 'create', html: '<input name="x">' },
       { card: 'artifact', op: 'create', id: 'art-s5', revision: 1, html: '<input name="x">' },
     ))} />)
-    const buttons = Array.from(container.querySelectorAll('button'))
-    expect(buttons.some(button => button.textContent?.includes('Submit interaction'))).toBe(true)
+    const actions = container.querySelector('[data-artifact-actions]')
+    expect(actions).not.toBeNull()
+    const labels = Array.from(actions!.querySelectorAll('button')).map(button => button.textContent ?? '')
+    expect(labels.some(text => text.includes('Source'))).toBe(true)
+    expect(labels.some(text => text.includes('Copy HTML'))).toBe(true)
+    expect(labels.some(text => text.includes('Submit interaction'))).toBe(true)
+    // The action row sits after the iframe in the surface's flow.
+    const frame = container.querySelector('iframe') as HTMLIFrameElement
+    const surface = container.querySelector('[data-artifact-surface]') as HTMLElement
+    const frameIndex = Array.from(surface.children).indexOf(frame)
+    const actionsIndex = Array.from(surface.children).indexOf(actions as HTMLElement)
+    expect(frameIndex).toBeGreaterThanOrEqual(0)
+    expect(actionsIndex).toBeGreaterThan(frameIndex)
   })
 })
 

@@ -49,6 +49,8 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "link:../dsh2026/deepseek-harness/vendor/cordis",
     "@deepseek-ai/dsh-agent": "link:../dsh2026/deepseek-harness/packages/core/agent",
+    "@deepseek-ai/dsh-commands": "link:../dsh2026/deepseek-harness/packages/interaction/commands",
+    "@deepseek-ai/dsh-llm": "link:../dsh2026/deepseek-harness/packages/llm/llm",
     "@deepseek-ai/dsh-session": "link:../dsh2026/deepseek-harness/packages/core/session",
     "@deepseek-ai/dsh-tools": "link:../dsh2026/deepseek-harness/packages/core/tools",
     "@deepseek-ai/schemastery": "link:../dsh2026/deepseek-harness/vendor/schemastery",
@@ -60,7 +62,6 @@
     "@deepseek-ai/dsh-client-ui-conversation": "link:../dsh2026/deepseek-harness/packages/client/ui-conversation",
     "@deepseek-ai/dsh-client-ui-layout": "link:../dsh2026/deepseek-harness/packages/client/ui-layout",
     "@deepseek-ai/dsh-client-ui-tool": "link:../dsh2026/deepseek-harness/packages/client/ui-tool",
-    "@deepseek-ai/dsh-client-ui-conversation": "link:../dsh2026/deepseek-harness/packages/client/ui-conversation",
     "@types/node": "^22.0.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "^18.3.1",
