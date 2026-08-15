@@ -11,13 +11,15 @@ HTML 实时渲染插件：模型通过专门的 `artifact` 工具创建/修补 H
 
 ## 安装
 
-发布版走 GitHub Releases 的 tarball（`dsh plugin` 安装后自动加入 profile 层栈）：
+发布版走 GitHub Releases 的 tarball（`dsh plugin` 安装后自动加入 profile 层栈），`releases/latest` 永远指向最新版本，链接不用随版本改动：
 
 ```sh
-dsh plugin --profile web add "https://github.com/lehhair/dsh-html-artifact/releases/download/v0.1.0/dsh-external-dsh-html-artifact-0.1.0.tgz"
+dsh plugin --profile web add "https://github.com/lehhair/dsh-html-artifact/releases/latest/download/dsh-external-dsh-html-artifact.tgz"
 ```
 
 然后重启 dsh web 服务，刷新页面。**不要**用 `dsh plugin add github:lehhair/dsh-html-artifact` 安装源码（仓库的 `lib/` 被 gitignore，源码安装没有构建产物）。
+
+> ⚠️ 升级注意：pnpm 会按 URL 缓存 tarball——同一 `latest` 链接在新版本发布后可能命中旧缓存。装到旧版时先 `dsh plugin --profile web remove @dsh-external/dsh-html-artifact` 再重新安装（必要时 `pnpm store prune`）。
 
 ## 用法
 
