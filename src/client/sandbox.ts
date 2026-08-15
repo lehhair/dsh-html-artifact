@@ -13,8 +13,9 @@ export type ArtifactTheme = 'light' | 'dark'
 
 /** Content-Security-Policy for artifact documents: no network to the host, no
  *  frames/objects/forms; scripts/styles may be inline; https/http resources
- *  (images, fonts, styles, fetches) are allowed. */
-const ARTIFACT_CSP = `default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; img-src https: http: data: blob:; media-src https: http: data: blob:; font-src https: http: data:; style-src 'unsafe-inline' https: http:; script-src 'unsafe-inline' 'unsafe-eval' https: http: blob:; connect-src https: http:`
+ *  (images, fonts, styles, fetches) are allowed. Shared by the settled
+ *  surface (sandbox.ts) and the streaming bridge (stream/bridge.ts). */
+export const ARTIFACT_CSP = `default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; img-src https: http: data: blob:; media-src https: http: data: blob:; font-src https: http: data:; style-src 'unsafe-inline' https: http:; script-src 'unsafe-inline' 'unsafe-eval' https: http: blob:; connect-src https: http:`
 
 /** CSS custom properties the artifact document exposes for the host theme. */
 const ARTIFACT_THEME_VARS: Record<ArtifactTheme, Record<string, string>> = {

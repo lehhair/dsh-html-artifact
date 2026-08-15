@@ -102,3 +102,37 @@
   color: var(--text-muted);
   padding: 4px 0;
 }
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 720px;
+}
+
+.draftBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.draftPulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent, #185fa5);
+  animation: dshArtifactPulse 1.2s ease-in-out infinite;
+}
+
+.draftLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes dshArtifactPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

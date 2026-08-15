@@ -38,6 +38,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-tool':
         specifier: link:../dsh2026/deepseek-harness/packages/client/ui-tool
         version: link:../dsh2026/deepseek-harness/packages/client/ui-tool
+      '@deepseek-ai/dsh-session':
+        specifier: link:../dsh2026/deepseek-harness/packages/core/session
+        version: link:../dsh2026/deepseek-harness/packages/core/session
       '@deepseek-ai/dsh-tools':
         specifier: link:../dsh2026/deepseek-harness/packages/core/tools
         version: link:../dsh2026/deepseek-harness/packages/core/tools
