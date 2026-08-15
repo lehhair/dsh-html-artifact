@@ -15,6 +15,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue, ToolResultView } from '@deepseek-ai/dsh-tools'
 import { ArtifactStore, truncateHtml, type ArtifactState } from './registry.ts'
@@ -38,10 +39,10 @@ export interface Config {
 }
 
 /** Schemastery configuration for the artifact tool consumer. */
-export const Config = {
-  maxArtifactBytes: { type: 'number', default: DEFAULT_MAX_ARTIFACT_BYTES },
-  maxReadBytes: { type: 'number', default: DEFAULT_MAX_READ_BYTES },
-} as const
+export const Config = z.object({
+  maxArtifactBytes: z.number().min(1).default(DEFAULT_MAX_ARTIFACT_BYTES),
+  maxReadBytes: z.number().min(1).default(DEFAULT_MAX_READ_BYTES),
+})
 
 /** The tool's op vocabulary, one per lifecycle stage. */
 type ArtifactOp = 'create' | 'patch' | 'read' | 'destroy' | 'list'

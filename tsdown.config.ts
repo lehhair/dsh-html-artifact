@@ -42,7 +42,7 @@ export default [
     dts: true,
     clean: true,
     deps: {
-      neverBundle: ['schemastery', 'cordis'],
+      neverBundle: ['@deepseek-ai/schemastery', '@deepseek-ai/cordis'],
     },
   },
   {
